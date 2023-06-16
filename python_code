@@ -1,0 +1,195 @@
+import random
+import PySimpleGUI as sg
+
+class Ad:
+    def __init__(self, ad_id, advertiser, content):
+        self.ad_id = ad_id
+        self.advertiser = advertiser
+        self.content = content
+        self.interests = {}
+
+class AdNode:
+    def __init__(self, ad):
+        self.ad = ad
+        self.left = None
+        self.right = None
+
+class AdTree:
+    def __init__(self):
+        self.root = None
+
+    def insert(self, ad):
+        if not self.root:
+            self.root = AdNode(ad)
+        else:
+            self._insert_recursive(ad, self.root)
+
+    def _insert_recursive(self, ad, node):
+        if ad.ad_id < node.ad.ad_id:
+            if node.left:
+                self._insert_recursive(ad, node.left)
+            else:
+                node.left = AdNode(ad)
+        else:
+            if node.right:
+                self._insert_recursive(ad, node.right)
+            else:
+                node.right = AdNode(ad)
+
+    def search(self, ad_id):
+        return self._search_recursive(ad_id, self.root)
+
+    def _search_recursive(self, ad_id, node):
+        if not node or node.ad.ad_id == ad_id:
+            return node
+        if ad_id < node.ad.ad_id:
+            return self._search_recursive(ad_id, node.left)
+        else:
+            return self._search_recursive(ad_id, node.right)
+
+    def get_random_ad(self):
+        ad_list = []
+        self._in_order_traversal(self.root, ad_list)
+        if ad_list:
+            return random.choice(ad_list)
+        return None
+
+    def _in_order_traversal(self, node, ad_list):
+        if node:
+            self._in_order_traversal(node.left, ad_list)
+            ad_list.append(node.ad)
+            self._in_order_traversal(node.right, ad_list)
+
+class Advertiser:
+    def __init__(self, advertiser_id, name):
+        self.advertiser_id = advertiser_id
+        self.name = name
+        self.ads = AdTree()
+
+class OnlineAdvertisingSystem:
+    def __init__(self):
+        self.advertisers = {}
+
+    def create_advertiser(self, advertiser_id, name):
+        if advertiser_id not in self.advertisers:
+            advertiser = Advertiser(advertiser_id, name)
+            self.advertisers[advertiser_id] = advertiser
+
+    def create_ad(self, advertiser_id, ad_id, content, interests):
+        if advertiser_id in self.advertisers:
+            advertiser = self.advertisers[advertiser_id]
+            ad = Ad(ad_id, advertiser, content)
+            advertiser.ads.insert(ad)
+
+            for interest in interests:
+                if interest not in ad.interests:
+                    ad.interests[interest] = []
+                ad.interests[interest].append(ad)
+
+    def get_ad(self, ad_id):
+        for advertiser in self.advertisers.values():
+            ad_node = advertiser.ads.search(ad_id)
+            if ad_node:
+                return ad_node.ad
+        return None
+
+    def get_random_ad(self):
+        ad_list = []
+        for advertiser in self.advertisers.values():
+            self._in_order_traversal(advertiser.ads.root, ad_list)
+        if ad_list:
+            return random.choice(ad_list)
+        return None
+
+    def get_ad_by_interest(self, interest):
+        matching_ads = []
+        for advertiser in self.advertisers.values():
+            self._search_interest(advertiser.ads.root, interest, matching_ads)
+        return matching_ads
+
+    def _search_interest(self, node, interest, matching_ads):
+        if node:
+            self._search_interest(node.left, interest, matching_ads)
+            if interest in node.ad.interests:
+                matching_ads.append(node.ad)
+            self._search_interest(node.right, interest, matching_ads)
+
+    def _in_order_traversal(self, node, ad_list):
+        if node:
+            self._in_order_traversal(node.left, ad_list)
+            ad_list.append(node.ad)
+            self._in_order_traversal(node.right, ad_list)
+
+
+# Create the Online Advertising System instance
+ads_system = OnlineAdvertisingSystem()
+
+# Define the layout for the GUI
+layout = [
+    [sg.Text("Welcome to the Online Advertising System!")],
+    [sg.Text("Please select an option:")],
+    [sg.Button("Create Advertiser"), sg.Button("Create Ad")],
+    [sg.Button("Get Ad by ID"), sg.Button("Get Random Ad")],
+    [sg.Button("Get Ad by Interest"), sg.Button("Exit")],
+    [sg.Output(size=(80, 20))]
+]
+
+# Create the window
+window = sg.Window("Online Advertising System", layout)
+
+# Event loop
+while True:
+    event, values = window.read()
+
+    if event == sg.WINDOW_CLOSED or event == "Exit":
+        break
+
+    if event == "Create Advertiser":
+        advertiser_id = int(sg.popup_get_text("Enter advertiser ID: "))
+        name = sg.popup_get_text("Enter advertiser name: ")
+        ads_system.create_advertiser(advertiser_id, name)
+        print("Advertiser created successfully!")
+
+    if event == "Create Ad":
+        advertiser_id = int(sg.popup_get_text("Enter advertiser ID: "))
+        ad_id = int(sg.popup_get_text("Enter ad ID: "))
+        content = sg.popup_get_text("Enter ad content: ")
+        interests = sg.popup_get_text("Enter ad interests (comma-separated): ").split(",")
+        ads_system.create_ad(advertiser_id, ad_id, content, interests)
+        print("Ad created successfully!")
+
+    if event == "Get Ad by ID":
+        ad_id = int(sg.popup_get_text("Enter ad ID: "))
+        ad = ads_system.get_ad(ad_id)
+        if ad:
+            print(f"Ad ID: {ad.ad_id}")
+            print(f"Advertiser ID: {ad.advertiser.advertiser_id}")
+            print(f"Advertiser Name: {ad.advertiser.name}")
+            print(f"Content: {ad.content}")
+        else:
+            print("Ad not found")
+
+    if event == "Get Random Ad":
+        ad = ads_system.get_random_ad()
+        if ad:
+            print(f"Random Ad ID: {ad.ad_id}")
+            print(f"Advertiser ID: {ad.advertiser.advertiser_id}")
+            print(f"Advertiser Name: {ad.advertiser.name}")
+            print(f"Content: {ad.content}")
+        else:
+            print("No ads available")
+
+    if event == "Get Ad by Interest":
+        interest = sg.popup_get_text("Enter your interest: ")
+        matching_ads = ads_system.get_ad_by_interest(interest)
+        if matching_ads:
+            print("Matching Ads:")
+            for ad in matching_ads:
+                print(f"Ad ID: {ad.ad_id}")
+                print(f"Advertiser ID: {ad.advertiser.advertiser_id}")
+                print(f"Advertiser Name: {ad.advertiser.name}")
+                print(f"Content: {ad.content}")
+        else:
+            print("No ads found for the given interest")
+
+window.close()
